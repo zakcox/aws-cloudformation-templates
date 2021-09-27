@@ -9,7 +9,7 @@ Description: A stack for deploying containerized applications onto a cluster of 
 Parameters:
   DesiredCapacity:
     Type: Number
-    Default: '3'
+    Default: '1'
     Description: Number of EC2 instances to launch in your ECS cluster.
   MaxSize:
     Type: Number
@@ -22,38 +22,21 @@ Parameters:
   InstanceType:
     Description: EC2 instance type
     Type: String
-    Default: c4.xlarge
-    AllowedValues: [t2.micro, t2.small, t2.medium, t2.large, m3.medium, m3.large,
-      m3.xlarge, m3.2xlarge, m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge,
-      c4.large, c4.xlarge, c4.2xlarge, c4.4xlarge, c4.8xlarge, c3.large, c3.xlarge,
-      c3.2xlarge, c3.4xlarge, c3.8xlarge, r3.large, r3.xlarge, r3.2xlarge, r3.4xlarge,
-      r3.8xlarge, i2.xlarge, i2.2xlarge, i2.4xlarge, i2.8xlarge]
+    Default: t3.medium
+    AllowedValues: [t3.micro, t3.small, t3.medium, t3.large, m5.large, m5.xlarge, m5.2xlarge]
     ConstraintDescription: Please choose a valid instance type.
 Mappings:
-  # Hard values for the subnet masks. These masks define
-  # the range of internal IP addresses that can be assigned.
-  # The VPC can have all IP's from 10.0.0.0 to 10.0.255.255
-  # There are four subnets which cover the ranges:
-  #
-  # 10.0.0.0 - 10.0.0.255
-  # 10.0.1.0 - 10.0.1.255
-  # 10.0.2.0 - 10.0.2.255
-  # 10.0.3.0 - 10.0.3.255
-  #
-  # If you need more IP addresses (perhaps you have so many
-  # instances that you run out) then you can customize these
-  # ranges to add more
   SubnetConfig:
     VPC:
-      CIDR: '10.0.0.0/16'
+      CIDR: '10.21.48.0/20'
     PublicOne:
-      CIDR: '10.0.0.0/24'
+      CIDR: '10.21.48.0/22'
     PublicTwo:
-      CIDR: '10.0.1.0/24'
+      CIDR: '10.21.56.0/22'
     PrivateOne:
-      CIDR: '10.0.2.0/24'
+      CIDR: '10.21.52.0/22'
     PrivateTwo:
-      CIDR: '10.0.3.0/24'
+      CIDR: '10.21.60.0/22'
 Resources:
   # VPC in which containers will be networked.
   # It has two public subnets, and two private subnets.
@@ -65,8 +48,6 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
       CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
-
-  # Two public subnets, where containers can have public IP addresses
   PublicSubnetOne:
     Type: AWS::EC2::Subnet
     Properties:
@@ -76,7 +57,7 @@ Resources:
          - Fn::GetAZs: {Ref: 'AWS::Region'}
       VpcId: !Ref 'VPC'
       CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
   PublicSubnetTwo:
     Type: AWS::EC2::Subnet
     Properties:
@@ -86,11 +67,7 @@ Resources:
          - Fn::GetAZs: {Ref: 'AWS::Region'}
       VpcId: !Ref 'VPC'
       CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
-      MapPublicIpOnLaunch: true
-
-  # Two private subnets where containers will only have private
-  # IP addresses, and will only be reachable by other members of the
-  # VPC
+      MapPublicIpOnLaunch: false
   PrivateSubnetOne:
     Type: AWS::EC2::Subnet
     Properties:
@@ -112,35 +89,35 @@ Resources:
 
   # Setup networking resources for the public subnets. Containers
   # in the public subnets have public IP addresses and the routing table
-  # sends network traffic via the internet gateway.
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-  GatewayAttachement:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref 'VPC'
-      InternetGatewayId: !Ref 'InternetGateway'
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref 'VPC'
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: GatewayAttachement
-    Properties:
-      RouteTableId: !Ref 'PublicRouteTable'
-      DestinationCidrBlock: '0.0.0.0/0'
-      GatewayId: !Ref 'InternetGateway'
-  PublicSubnetOneRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetOne
-      RouteTableId: !Ref PublicRouteTable
-  PublicSubnetTwoRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetTwo
-      RouteTableId: !Ref PublicRouteTable
+  # # sends network traffic via the internet gateway.
+  # InternetGateway:
+  #   Type: AWS::EC2::InternetGateway
+  # GatewayAttachment:
+  #   Type: AWS::EC2::VPCGatewayAttachment
+  #   Properties:
+  #     VpcId: !Ref 'VPC'
+  #     InternetGatewayId: !Ref 'InternetGateway'
+  # PublicRouteTable:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     VpcId: !Ref 'VPC'
+  # PublicRoute:
+  #   Type: AWS::EC2::Route
+  #   DependsOn: GatewayAttachment
+  #   Properties:
+  #     RouteTableId: !Ref 'PublicRouteTable'
+  #     DestinationCidrBlock: '0.0.0.0/0'
+  #     GatewayId: !Ref 'InternetGateway'
+  # PublicSubnetOneRouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId: !Ref PublicSubnetOne
+  #     RouteTableId: !Ref PublicRouteTable
+  # PublicSubnetTwoRouteTableAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId: !Ref PublicSubnetTwo
+  #     RouteTableId: !Ref PublicRouteTable
 
   # Setup networking resources for the private subnets. Containers
   # in these subnets have only private IP addresses, and must use a NAT
@@ -148,12 +125,12 @@ Resources:
   # each private subnet.
   NatGatewayOneAttachment:
     Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachement
+    DependsOn: GatewayAttachment
     Properties:
         Domain: vpc
   NatGatewayTwoAttachment:
     Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachement
+    DependsOn: GatewayAttachment
     Properties:
         Domain: vpc
   NatGatewayOne:
@@ -198,25 +175,25 @@ Resources:
       SubnetId: !Ref PrivateSubnetTwo
 
   # OPTIONAL: VPC Endpoint for DynamoDB
-  # If a container needs to access DynamoDB this allows a container in the private subnet
-  # to talk to DynamoDB directly without needing to go via the NAT gateway. This reduces
-  # the amount of bandwidth through the gateway, meaning that the gateway is free to serve
-  # your other traffic.
-  DynamoDBEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Action: "*"
-            Principal: "*"
-            Resource: "*"
-      RouteTableIds:
-        - !Ref 'PrivateRouteTableOne'
-        - !Ref 'PrivateRouteTableTwo'
-      ServiceName: !Join [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".dynamodb" ] ]
-      VpcId: !Ref 'VPC'
+  # # If a container needs to access DynamoDB this allows a container in the private subnet
+  # # to talk to DynamoDB directly without needing to go via the NAT gateway. This reduces
+  # # the amount of bandwidth through the gateway, meaning that the gateway is free to serve
+  # # your other traffic.
+  # DynamoDBEndpoint:
+  #   Type: AWS::EC2::VPCEndpoint
+  #   Properties:
+  #     PolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Action: "*"
+  #           Principal: "*"
+  #           Resource: "*"
+  #     RouteTableIds:
+  #       - !Ref 'PrivateRouteTableOne'
+  #       - !Ref 'PrivateRouteTableTwo'
+  #     ServiceName: !Join [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".dynamodb" ] ]
+  #     VpcId: !Ref 'VPC'
 
   # ECS Resources
   ECSCluster:
@@ -235,13 +212,13 @@ Resources:
     Properties:
       GroupDescription: Access to the ECS hosts that run containers
       VpcId: !Ref 'VPC'
-  EcsSecurityGroupIngressFromPublicALB:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      Description: Ingress from the public ALB
-      GroupId: !Ref 'EcsHostSecurityGroup'
-      IpProtocol: -1
-      SourceSecurityGroupId: !Ref 'PublicLoadBalancerSG'
+  # EcsSecurityGroupIngressFromPublicALB:
+  #   Type: AWS::EC2::SecurityGroupIngress
+  #   Properties:
+  #     Description: Ingress from the public ALB
+  #     GroupId: !Ref 'EcsHostSecurityGroup'
+  #     IpProtocol: -1
+  #     SourceSecurityGroupId: !Ref 'PublicLoadBalancerSG'
   EcsSecurityGroupIngressFromPrivateALB:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
